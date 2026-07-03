@@ -1,0 +1,122 @@
+# =============================================================================
+# MODULO 1 - Infraestrutura de Rede e Injecao de Caos
+# Orquestra: 1 broker Kafka + 3 sensores (produtores) + 4 semaforos (atuadores).
+# Rede interna isolada 'sdnet'. Caos aplicado via scripts em modulo1_infra/chaos/.
+# [Van Steen Cap.3 - Processos/conteinerizacao | Cap.4 - Comunicacao via broker]
+# =============================================================================
+services:
+
+  # ---------------- Broker Pub-Sub (Kafka em modo KRaft, sem Zookeeper) -------
+  kafka:
+    image: bitnami/kafka:3.6
+    container_name: kafka
+    networks: [sdnet]
+    environment:
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  # ---------------- MODULO 2 - Sensores (Produtores + Lamport) ----------------
+  # Cada sensor tem deriva de relogio fisico diferente (Restricao C).
+  sensor-1:
+    build: .
+    container_name: sensor-1
+    networks: [sdnet]
+    cap_add: [NET_ADMIN]              # necessario para tc/netem (caos)
+    depends_on:
+      kafka: {condition: service_healthy}
+    environment: [SENSOR_ID=sensor-1, "CLOCK_OFFSET=5.0", "CLOCK_SKEW=0.002"]
+    volumes: ["state:/data"]
+    command: python -m modulo2_sensores.sensor
+    restart: unless-stopped
+
+  sensor-2:
+    build: .
+    container_name: sensor-2
+    networks: [sdnet]
+    cap_add: [NET_ADMIN]
+    depends_on:
+      kafka: {condition: service_healthy}
+    environment: [SENSOR_ID=sensor-2, "CLOCK_OFFSET=-3.0", "CLOCK_SKEW=-0.001"]
+    volumes: ["state:/data"]
+    command: python -m modulo2_sensores.sensor
+    restart: unless-stopped
+
+  sensor-3:
+    build: .
+    container_name: sensor-3
+    networks: [sdnet]
+    cap_add: [NET_ADMIN]
+    depends_on:
+      kafka: {condition: service_healthy}
+    environment: [SENSOR_ID=sensor-3, "CLOCK_OFFSET=8.5", "CLOCK_SKEW=0.003"]
+    volumes: ["state:/data"]
+    command: python -m modulo2_sensores.sensor
+    restart: unless-stopped
+
+  # ---------------- MODULO 3 - Semaforos (Atuadores + Bully + Quorum) ---------
+  semaforo-1:
+    build: .
+    container_name: semaforo-1
+    networks: [sdnet]
+    cap_add: [NET_ADMIN]
+    depends_on:
+      kafka: {condition: service_healthy}
+    environment: [NODE_ID=1, TOTAL_SEMAFOROS=4]
+    volumes: ["state:/data"]
+    command: python -m modulo3_semaforos.semaforo
+    restart: unless-stopped
+
+  semaforo-2:
+    build: .
+    container_name: semaforo-2
+    networks: [sdnet]
+    cap_add: [NET_ADMIN]
+    depends_on:
+      kafka: {condition: service_healthy}
+    environment: [NODE_ID=2, TOTAL_SEMAFOROS=4]
+    volumes: ["state:/data"]
+    command: python -m modulo3_semaforos.semaforo
+    restart: unless-stopped
+
+  semaforo-3:
+    build: .
+    container_name: semaforo-3
+    networks: [sdnet]
+    cap_add: [NET_ADMIN]
+    depends_on:
+      kafka: {condition: service_healthy}
+    environment: [NODE_ID=3, TOTAL_SEMAFOROS=4]
+    volumes: ["state:/data"]
+    command: python -m modulo3_semaforos.semaforo
+    restart: unless-stopped
+
+  semaforo-4:
+    build: .
+    container_name: semaforo-4
+    networks: [sdnet]
+    cap_add: [NET_ADMIN]
+    depends_on:
+      kafka: {condition: service_healthy}
+    environment: [NODE_ID=4, TOTAL_SEMAFOROS=4]
+    volumes: ["state:/data"]
+    command: python -m modulo3_semaforos.semaforo
+    restart: unless-stopped
+
+networks:
+  sdnet:
+    driver: bridge
+
+volumes:
+  state:        # volume para os checkpoints locais (Modulo 4)
