@@ -8,7 +8,7 @@ services:
 
   # ---------------- Broker Pub-Sub (Kafka em modo KRaft, sem Zookeeper) -------
   kafka:
-    image: bitnami/kafka:3.6
+    image: bitnamilegacy/kafka:3.6.2
     container_name: kafka
     networks: [sdnet]
     environment:
