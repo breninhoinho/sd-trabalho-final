@@ -4,6 +4,13 @@ Protótipo de sistema distribuído **descentralizado**, baseado em eventos (**Pu
 
 ---
 
+## Integrantes do Grupo
+
+```
+1. Artur Kioshi de Almeida Nacafucasaco (802405)
+2. Breno Dias Arantes dos Santos (800577)
+```
+
 ## 1. Resumo: como funciona
 
 São **8 contêineres** numa rede Docker isolada (`sdnet`):
